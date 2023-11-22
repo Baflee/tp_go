@@ -1,0 +1,10 @@
+2023/11/22 14:28:40 Time: 2023-11-22 14:28:40.4068246 +0100 CET m=+50.975338901, Method: DELETE, Path: /dictionary/delete/calo
+2023/11/22 14:42:43 Time: 2023-11-22 14:42:43.3095449 +0100 CET m=+11.526019001, Method: GET, Path: /dictionary
+2023/11/22 14:42:46 Time: 2023-11-22 14:42:46.3835989 +0100 CET m=+14.600073001, Method: GET, Path: /dictionary/FreddyFazbear
+2023/11/22 14:42:51 Time: 2023-11-22 14:42:51.6234178 +0100 CET m=+19.839891901, Method: GET, Path: /dictionary/Variables
+2023/11/22 14:43:05 Time: 2023-11-22 14:43:05.3597819 +0100 CET m=+33.576256001, Method: POST, Path: /dictionary/add
+2023/11/22 14:43:07 Time: 2023-11-22 14:43:07.7079124 +0100 CET m=+35.924386501, Method: GET, Path: /dictionary
+2023/11/22 14:43:11 Time: 2023-11-22 14:43:11.6923105 +0100 CET m=+39.908784601, Method: DELETE, Path: /dictionary/delete/calo
+2023/11/22 14:43:20 Time: 2023-11-22 14:43:20.649017 +0100 CET m=+48.865491101, Method: DELETE, Path: /dictionary/delete/FreddyFazbear
+2023/11/22 14:43:27 Time: 2023-11-22 14:43:27.7260907 +0100 CET m=+55.942564801, Method: DELETE, Path: /dictionary/delete/redede
+2023/11/22 14:43:29 Time: 2023-11-22 14:43:29.7215946 +0100 CET m=+57.938068701, Method: DELETE, Path: /dictionary/delete/redede
