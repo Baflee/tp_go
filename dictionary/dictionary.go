@@ -12,7 +12,6 @@ func init() {
 	go handleRemoveRequests()
 	go handleGetRequests()
 	go handleListRequests()
-	go handleResetRequests()
 }
 
 var (
@@ -20,7 +19,6 @@ var (
 	removeChan   = make(chan GetRemoveRequest)
 	getChan      = make(chan GetRemoveRequest)
 	listChan     = make(chan ResetListRequest)
-	resetChan    = make(chan ResetListRequest)
 	responseChan = make(chan Response)
 )
 
@@ -28,6 +26,7 @@ type AddRequest struct {
 	FilePath string
 	Key      string
 	Value    string
+	Response chan Response
 }
 
 type GetRemoveRequest struct {
@@ -46,55 +45,82 @@ type Response struct {
 	Err    error
 }
 
-func Add(filePath string, key string, value string) {
-	addChan <- AddRequest{FilePath: filePath, Key: key, Value: value}
+func Add(filePath string, key string, value string) (string, error) {
+	responseChan := make(chan Response)
+	addChan <- AddRequest{FilePath: filePath, Key: key, Value: value, Response: responseChan}
+	response := <-responseChan
+	return response.Result, response.Err
 }
 
-func Remove(filePath string, key string) {
-	removeChan <- GetRemoveRequest{FilePath: filePath, Key: key}
+func Remove(filePath string, key string) (string, error) {
+	responseChan := make(chan Response)
+	removeChan <- GetRemoveRequest{FilePath: filePath, Key: key, Response: responseChan}
+	response := <-responseChan
+	return response.Result, response.Err
 }
 
 func Get(filePath string, key string) (string, error) {
+	responseChan := make(chan Response)
 	getChan <- GetRemoveRequest{FilePath: filePath, Key: key, Response: responseChan}
 	response := <-responseChan
 	return response.Result, response.Err
 }
 
 func List(filePath string) (string, error) {
+	responseChan := make(chan Response)
 	listChan <- ResetListRequest{FilePath: filePath, Response: responseChan}
 	response := <-responseChan
 	return response.Result, response.Err
 }
 
-func Reset(filePath string) {
-	resetChan <- ResetListRequest{FilePath: filePath}
-}
-
 func handleAddRequests() {
 	for req := range addChan {
+		exists, err := wordExists(req.FilePath, req.Key)
+		if err != nil {
+			req.Response <- Response{"", err}
+			continue
+		}
+		if exists {
+			req.Response <- Response{"", fmt.Errorf("Word '%s' already exists", req.Key)}
+			continue
+		}
+
 		f, err := os.OpenFile(req.FilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			fmt.Println("Error:", err)
-			return
+			req.Response <- Response{"", err}
+			continue
 		}
 
 		_, err = f.WriteString(req.Key + ":" + req.Value + "\n")
-		if err != nil {
-			fmt.Println("Error writing to file:", err)
+		closeErr := f.Close()
+		if err != nil || closeErr != nil {
+			req.Response <- Response{"", fmt.Errorf("%v %v", err, closeErr)}
+			continue
 		}
-		f.Close()
+
+		req.Response <- Response{"Success", nil}
 	}
 }
 
 func handleRemoveRequests() {
 	for req := range removeChan {
+		exists, err := wordExists(req.FilePath, req.Key)
+		if err != nil {
+			req.Response <- Response{"", err}
+			continue
+		}
+		if !exists {
+			req.Response <- Response{"", fmt.Errorf("Word '%s' does not exist", req.Key)}
+			continue
+		}
+
 		contentBytes, err := os.ReadFile(req.FilePath)
 		if err != nil {
-			fmt.Println("Error reading file:", err)
-			return
+			req.Response <- Response{"", err}
+			continue
 		}
-		content := string(contentBytes)
 
+		content := string(contentBytes)
 		lines := strings.Split(content, "\n")
 
 		var updatedLines []string
@@ -105,12 +131,13 @@ func handleRemoveRequests() {
 		}
 
 		updatedContent := strings.Join(updatedLines, "\n")
-
 		err = os.WriteFile(req.FilePath, []byte(updatedContent), 0644)
 		if err != nil {
-			fmt.Println("Error writing to file:", err)
-			return
+			req.Response <- Response{"", err}
+			continue
 		}
+
+		req.Response <- Response{"Success", nil}
 	}
 }
 
@@ -138,7 +165,7 @@ func handleGetRequests() {
 		if found {
 			req.Response <- Response{line, nil}
 		} else {
-			req.Response <- Response{"", fmt.Errorf("Key not found: %s", req.Key)}
+			req.Response <- Response{"", fmt.Errorf("%s not found", req.Key)}
 		}
 	}
 }
@@ -171,15 +198,27 @@ func handleListRequests() {
 	}
 }
 
-func handleResetRequests() {
-	for req := range resetChan {
-		f, err := os.OpenFile(req.FilePath, os.O_WRONLY|os.O_TRUNC, 0644)
-		if err != nil {
-			fmt.Println("Error opening file:", err)
-			return
+func wordExists(filePath string, word string) (bool, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		// If the file does not exist, treat it as if the word does not exist.
+		if os.IsNotExist(err) {
+			return false, nil
 		}
-		defer f.Close()
-
-		fmt.Println("File content reset successfully.")
+		return false, err
 	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		if strings.HasPrefix(scanner.Text(), word+":") {
+			return true, nil
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return false, err
+	}
+
+	return false, nil
 }

@@ -1,80 +1,77 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"strings"
+	"net/http"
 	"tp_go/dictionary"
+
+	"github.com/gorilla/mux"
 )
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
 	const filePath = "dictionary.txt"
+	r := mux.NewRouter()
 
-	for {
-		fmt.Println("__________________________________________________________")
-		fmt.Println("Choisissez une action: add, define, remove, list, ou quit.")
-		action, _ := reader.ReadString('\n')
-		action = strings.TrimSpace(action)
+	r.HandleFunc("/dictionary/add", func(w http.ResponseWriter, r *http.Request) {
+		actionAdd(filePath, w, r)
+	}).Methods("POST")
 
-		switch action {
-		case "add":
-			actionAdd(filePath, reader)
-		case "define":
-			actionDefine(filePath, reader)
-		case "remove":
-			actionRemove(filePath, reader)
-		case "list":
-			actionList(filePath)
-		case "quit":
-			return
-		default:
-			fmt.Println("Action non reconnue")
-		}
+	r.HandleFunc("/dictionary/{word}", func(w http.ResponseWriter, r *http.Request) {
+		actionDefine(filePath, w, r)
+	}).Methods("GET")
+
+	r.HandleFunc("/dictionary/delete/{word}", func(w http.ResponseWriter, r *http.Request) {
+		actionRemove(filePath, w, r)
+	}).Methods("DELETE")
+
+	r.HandleFunc("/dictionary", func(w http.ResponseWriter, r *http.Request) {
+		actionList(filePath, w, r)
+	}).Methods("GET")
+
+	http.ListenAndServe(":8080", r)
+}
+
+func actionAdd(filePath string, w http.ResponseWriter, r *http.Request) {
+	key := r.FormValue("word")
+	value := r.FormValue("definition")
+
+	_, err := dictionary.Add(filePath, key, value)
+	if err != nil {
+		http.Error(w, "Error : "+err.Error(), http.StatusInternalServerError)
+	} else {
+		fmt.Fprintf(w, "Word %s Added", key)
 	}
 }
 
-func actionAdd(filePath string, reader *bufio.Reader) {
-	fmt.Print("Entrez le mot : ")
-	key, _ := reader.ReadString('\n')
-	key = strings.TrimSpace(key)
-
-	fmt.Print("Entrez la définition : ")
-	value, _ := reader.ReadString('\n')
-	value = strings.TrimSpace(value)
-
-	dictionary.Add(filePath, key, value)
-	fmt.Println("Mot ajouté avec succès.")
-}
-
-func actionDefine(filePath string, reader *bufio.Reader) {
-	fmt.Print("Entrez le mot à définir : ")
-	key, _ := reader.ReadString('\n')
-	key = strings.TrimSpace(key)
+func actionDefine(filePath string, w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	key := vars["word"]
 
 	result, err := dictionary.Get(filePath, key)
 	if err != nil {
-		fmt.Println("Erreur :", err)
+		http.Error(w, "Error : "+err.Error(), http.StatusNotFound)
 	} else {
-		fmt.Println("Définition :", result)
+		fmt.Fprintf(w, "Definition of %s: %s", key, result)
 	}
 }
 
-func actionRemove(filePath string, reader *bufio.Reader) {
-	fmt.Print("Entrez le mot à supprimer : ")
-	key, _ := reader.ReadString('\n')
-	key = strings.TrimSpace(key)
+func actionRemove(filePath string, w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	key := vars["word"]
 
-	dictionary.Remove(filePath, key)
-	fmt.Println("Mot supprimé avec succès")
+	_, err := dictionary.Remove(filePath, key)
+	if err != nil {
+		http.Error(w, "Error : "+err.Error(), http.StatusInternalServerError)
+	} else {
+		fmt.Fprintf(w, "Word %s Deleted", key)
+	}
 }
 
-func actionList(filePath string) {
+func actionList(filePath string, w http.ResponseWriter, r *http.Request) {
 	result, err := dictionary.List(filePath)
 	if err != nil {
-		fmt.Println("Erreur :", err)
+		http.Error(w, "Error : "+err.Error(), http.StatusInternalServerError)
 	} else {
-		fmt.Println("Liste : \n", result)
+		fmt.Fprintf(w, "Word Lists: \n%s", result)
 	}
 }

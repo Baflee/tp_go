@@ -1,5 +1,8 @@
 Values:Go has various value types including strings, integers, floats, booleans, etc. Here are a few basic examples.
 Variables:In Go, variables are explicitly declared and used by the compiler to e.g. check type-correctness of function calls.
 paparrazi:fofgkwiogjiwgw
-fortnite:teeeet
-test:fortnite
+FreddyFazbear:huhuhuhuhuhu
+FreddyFazbear:huhuhuhuhuhu
+redede:fefrg
+redede:fefrg
+react:fffeferert
