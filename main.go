@@ -13,5 +13,7 @@ func main() {
 
 	r.Use(middleware.LoggingMiddleware)
 
+	r.Use(middleware.AuthMiddleware)
+
 	http.ListenAndServe(":8080", r)
 }

@@ -3,3 +3,4 @@ Variables:In Go, variables are explicitly declared and used by the compiler to e
 paparrazi:fofgkwiogjiwgw
 react:fffeferert
 Johnny:OPTIC2000000000000000
+JAFAGSRGSG:REDDY

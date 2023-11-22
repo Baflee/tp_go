@@ -8,3 +8,10 @@
 2023/11/22 14:43:20 Time: 2023-11-22 14:43:20.649017 +0100 CET m=+48.865491101, Method: DELETE, Path: /dictionary/delete/FreddyFazbear
 2023/11/22 14:43:27 Time: 2023-11-22 14:43:27.7260907 +0100 CET m=+55.942564801, Method: DELETE, Path: /dictionary/delete/redede
 2023/11/22 14:43:29 Time: 2023-11-22 14:43:29.7215946 +0100 CET m=+57.938068701, Method: DELETE, Path: /dictionary/delete/redede
+2023/11/22 19:14:33 Time: 2023-11-22 19:14:33.6236865 +0100 CET m=+13.478898701, Method: DELETE, Path: /dictionary/delete/redede
+2023/11/22 19:14:42 Time: 2023-11-22 19:14:42.6324925 +0100 CET m=+22.487704701, Method: DELETE, Path: /dictionary/delete/redede
+2023/11/22 19:16:10 Time: 2023-11-22 19:16:10.105057 +0100 CET m=+109.960269201, Method: DELETE, Path: /dictionary/delete/redede
+2023/11/22 19:16:25 Time: 2023-11-22 19:16:25.1654635 +0100 CET m=+125.020675701, Method: DELETE, Path: /dictionary/delete/redede
+2023/11/22 19:16:28 Time: 2023-11-22 19:16:28.6910124 +0100 CET m=+128.546224601, Method: DELETE, Path: /dictionary/delete/redede
+2023/11/22 19:16:39 Time: 2023-11-22 19:16:39.6292638 +0100 CET m=+139.484476001, Method: POST, Path: /dictionary/add
+2023/11/22 19:16:49 Time: 2023-11-22 19:16:49.7699096 +0100 CET m=+149.625121801, Method: POST, Path: /dictionary/add
