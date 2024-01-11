@@ -2,7 +2,9 @@ package dictionary
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -77,7 +79,15 @@ func List(filePath string) (string, error, int) {
 
 func handleAddRequests() {
 	for req := range addChan {
-		exists, err := wordExists(req.FilePath, req.Key)
+		contentFile, err := checkFile(req.FilePath)
+
+		if err != nil {
+			req.Response <- Response{"", fmt.Errorf("File '%s' not found", req.FilePath), http.StatusNotFound}
+			continue
+		}
+
+		exists, err := wordExists(contentFile, err, req.Key)
+
 		if len(req.Key) < 3 || len(req.Key) > 20 || len(req.Value) < 5 {
 			req.Response <- Response{"", fmt.Errorf("Invalid input data"), http.StatusBadRequest}
 			continue
@@ -87,6 +97,7 @@ func handleAddRequests() {
 			req.Response <- Response{"", err, http.StatusInternalServerError}
 			continue
 		}
+
 		if exists {
 			req.Response <- Response{"", fmt.Errorf("Word '%s' already exists", req.Key), http.StatusConflict}
 			continue
@@ -111,12 +122,20 @@ func handleAddRequests() {
 
 func handleRemoveRequests() {
 	for req := range removeChan {
-		exists, err := wordExists(req.FilePath, req.Key)
+		contentFile, err := checkFile(req.FilePath)
+
+		if err != nil {
+			req.Response <- Response{"", fmt.Errorf("File '%s' not found", req.FilePath), http.StatusNotFound}
+			continue
+		}
+
+		exists, err := wordExists(contentFile, err, req.Key)
 
 		if err != nil {
 			req.Response <- Response{"", err, http.StatusInternalServerError}
 			continue
 		}
+
 		if !exists {
 			req.Response <- Response{"", fmt.Errorf("Word '%s' does not exist", req.Key), http.StatusNotFound}
 			continue
@@ -151,13 +170,14 @@ func handleRemoveRequests() {
 
 func handleGetRequests() {
 	for req := range getChan {
-		f, err := os.Open(req.FilePath)
+		contentFile, err := checkFile(req.FilePath)
 		if err != nil {
-			req.Response <- Response{"", err, http.StatusInternalServerError}
+			req.Response <- Response{"", fmt.Errorf("File '%s' not found", req.FilePath), http.StatusNotFound}
 			continue
 		}
 
-		scanner := bufio.NewScanner(f)
+		reader := bufio.NewReader(bytes.NewReader(contentFile))
+		scanner := bufio.NewScanner(reader)
 		found := false
 		line := ""
 		for scanner.Scan() {
@@ -168,7 +188,6 @@ func handleGetRequests() {
 				break
 			}
 		}
-		f.Close()
 
 		if found {
 			req.Response <- Response{line, nil, http.StatusOK}
@@ -180,13 +199,15 @@ func handleGetRequests() {
 
 func handleListRequests() {
 	for req := range listChan {
-		f, err := os.Open(req.FilePath)
+		contentFile, err := checkFile(req.FilePath)
+
 		if err != nil {
-			req.Response <- Response{"", err, http.StatusInternalServerError}
+			req.Response <- Response{"", fmt.Errorf("File '%s' not found", req.FilePath), http.StatusNotFound}
 			continue
 		}
 
-		scanner := bufio.NewScanner(f)
+		reader := bufio.NewReader(bytes.NewReader(contentFile))
+		scanner := bufio.NewScanner(reader)
 		var lines []string
 
 		for scanner.Scan() {
@@ -201,23 +222,27 @@ func handleListRequests() {
 			combinedLines := strings.Join(lines, "\n")
 			req.Response <- Response{combinedLines, nil, http.StatusOK}
 		}
-
-		f.Close()
 	}
 }
 
-func wordExists(filePath string, word string) (bool, error) {
+func checkFile(filePath string) ([]byte, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
-		// If the file does not exist, treat it as if the word does not exist.
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, err
+		return nil, err
 	}
-	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
+	content, err := io.ReadAll(f)
+	defer f.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	return content, nil
+}
+
+func wordExists(contentFile []byte, err error, word string) (bool, error) {
+	reader := bufio.NewReader(bytes.NewReader(contentFile))
+	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		if strings.HasPrefix(scanner.Text(), word+":") {
 			return true, nil

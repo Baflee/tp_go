@@ -54,3 +54,13 @@
 2024/01/11 11:52:39 Time: 2024-01-11 11:52:39.0208236 +0100 CET m=+21.092951501, Method: POST, Path: /dictionary/add, Status: 200, Duration: 796.8µs
 2024/01/11 11:53:01 Time: 2024-01-11 11:53:01.8978756 +0100 CET m=+43.970003501, Method: POST, Path: /dictionary/add, Status: 400, Duration: 464.8µs
 2024/01/11 11:53:07 Time: 2024-01-11 11:53:07.4386256 +0100 CET m=+49.510753501, Method: POST, Path: /dictionary/add, Status: 400, Duration: 0s
+2024/01/11 16:01:18 Time: 2024-01-11 16:01:18.3885808 +0100 CET m=+12.157867801, Method: POST, Path: /dictionary/add, Status: 400, Duration: 4.6797ms
+2024/01/11 16:01:30 Time: 2024-01-11 16:01:30.5047458 +0100 CET m=+24.274032801, Method: POST, Path: /dictionary/add, Status: 200, Duration: 306.1µs
+2024/01/11 16:29:28 Time: 2024-01-11 16:29:28.9900266 +0100 CET m=+15.697081001, Method: GET, Path: /dictionary, Status: 401, Duration: 0s
+2024/01/11 16:33:51 Time: 2024-01-11 16:33:51.8368815 +0100 CET m=+12.193593301, Method: GET, Path: /dictionary, Status: 401, Duration: 41.7µs
+2024/01/11 16:33:53 Time: 2024-01-11 16:33:53.5256971 +0100 CET m=+13.882408901, Method: GET, Path: /dictionary, Status: 401, Duration: 1.0145ms
+2024/01/11 16:33:55 Time: 2024-01-11 16:33:55.6167771 +0100 CET m=+15.973488901, Method: GET, Path: /dictionary, Status: 401, Duration: 821µs
+2024/01/11 16:33:59 Time: 2024-01-11 16:33:59.783316 +0100 CET m=+20.140027801, Method: GET, Path: /dictionary/Variables, Status: 200, Duration: 0s
+2024/01/11 16:34:03 Time: 2024-01-11 16:34:03.6062777 +0100 CET m=+23.962989501, Method: GET, Path: /dictionary/t, Status: 404, Duration: 917.8µs
+2024/01/11 16:34:12 Time: 2024-01-11 16:34:12.9553856 +0100 CET m=+33.312097401, Method: DELETE, Path: /dictionary/delete/test, Status: 404, Duration: 197.6µs
+2024/01/11 16:34:27 Time: 2024-01-11 16:34:27.286691 +0100 CET m=+47.643402801, Method: DELETE, Path: /dictionary/delete/testa, Status: 200, Duration: 1.4245ms
