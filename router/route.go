@@ -3,6 +3,7 @@ package router
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"tp_go/dictionary"
 
 	"github.com/gorilla/mux"
@@ -34,9 +35,10 @@ func actionAdd(filePath string, w http.ResponseWriter, r *http.Request) {
 	key := r.FormValue("word")
 	value := r.FormValue("definition")
 
-	_, err := dictionary.Add(filePath, key, value)
+	_, err, statusCode := dictionary.Add(filePath, key, value)
 	if err != nil {
-		http.Error(w, "Error : "+err.Error(), http.StatusInternalServerError)
+		httpErrorMsg := "HTTP Error: " + strconv.Itoa(statusCode) + " - " + err.Error()
+		http.Error(w, httpErrorMsg, statusCode)
 	} else {
 		fmt.Fprintf(w, "Word %s Added", key)
 	}
@@ -46,9 +48,10 @@ func actionDefine(filePath string, w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	key := vars["word"]
 
-	result, err := dictionary.Get(filePath, key)
+	result, err, statusCode := dictionary.Get(filePath, key)
 	if err != nil {
-		http.Error(w, "Error : "+err.Error(), http.StatusNotFound)
+		httpErrorMsg := "HTTP Error: " + strconv.Itoa(statusCode) + " - " + err.Error()
+		http.Error(w, httpErrorMsg, statusCode)
 	} else {
 		fmt.Fprintf(w, "Definition of %s: %s", key, result)
 	}
@@ -58,18 +61,20 @@ func actionRemove(filePath string, w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	key := vars["word"]
 
-	_, err := dictionary.Remove(filePath, key)
+	_, err, statusCode := dictionary.Remove(filePath, key)
 	if err != nil {
-		http.Error(w, "Error : "+err.Error(), http.StatusInternalServerError)
+		httpErrorMsg := "HTTP Error: " + strconv.Itoa(statusCode) + " - " + err.Error()
+		http.Error(w, httpErrorMsg, statusCode)
 	} else {
 		fmt.Fprintf(w, "Word %s Deleted", key)
 	}
 }
 
 func actionList(filePath string, w http.ResponseWriter, r *http.Request) {
-	result, err := dictionary.List(filePath)
+	result, err, statusCode := dictionary.List(filePath)
 	if err != nil {
-		http.Error(w, "Error : "+err.Error(), http.StatusInternalServerError)
+		httpErrorMsg := "HTTP Error: " + strconv.Itoa(statusCode) + " - " + err.Error()
+		http.Error(w, httpErrorMsg, statusCode)
 	} else {
 		fmt.Fprintf(w, "Word Lists: \n%s", result)
 	}

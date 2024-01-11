@@ -3,6 +3,7 @@ package dictionary
 import (
 	"bufio"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 )
@@ -43,80 +44,87 @@ type ResetListRequest struct {
 type Response struct {
 	Result string
 	Err    error
+	Http   int
 }
 
-func Add(filePath string, key string, value string) (string, error) {
+func Add(filePath string, key string, value string) (string, error, int) {
 	responseChan := make(chan Response)
 	addChan <- AddRequest{FilePath: filePath, Key: key, Value: value, Response: responseChan}
 	response := <-responseChan
-	return response.Result, response.Err
+	return response.Result, response.Err, response.Http
 }
 
-func Remove(filePath string, key string) (string, error) {
+func Remove(filePath string, key string) (string, error, int) {
 	responseChan := make(chan Response)
 	removeChan <- GetRemoveRequest{FilePath: filePath, Key: key, Response: responseChan}
 	response := <-responseChan
-	return response.Result, response.Err
+	return response.Result, response.Err, response.Http
 }
 
-func Get(filePath string, key string) (string, error) {
+func Get(filePath string, key string) (string, error, int) {
 	responseChan := make(chan Response)
 	getChan <- GetRemoveRequest{FilePath: filePath, Key: key, Response: responseChan}
 	response := <-responseChan
-	return response.Result, response.Err
+	return response.Result, response.Err, response.Http
 }
 
-func List(filePath string) (string, error) {
+func List(filePath string) (string, error, int) {
 	responseChan := make(chan Response)
 	listChan <- ResetListRequest{FilePath: filePath, Response: responseChan}
 	response := <-responseChan
-	return response.Result, response.Err
+	return response.Result, response.Err, response.Http
 }
 
 func handleAddRequests() {
 	for req := range addChan {
 		exists, err := wordExists(req.FilePath, req.Key)
+		if len(req.Key) < 3 || len(req.Key) > 20 || len(req.Value) < 5 {
+			req.Response <- Response{"", fmt.Errorf("Invalid input data"), http.StatusBadRequest}
+			continue
+		}
+
 		if err != nil {
-			req.Response <- Response{"", err}
+			req.Response <- Response{"", err, http.StatusInternalServerError}
 			continue
 		}
 		if exists {
-			req.Response <- Response{"", fmt.Errorf("Word '%s' already exists", req.Key)}
+			req.Response <- Response{"", fmt.Errorf("Word '%s' already exists", req.Key), http.StatusConflict}
 			continue
 		}
 
 		f, err := os.OpenFile(req.FilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			req.Response <- Response{"", err}
+			req.Response <- Response{"", err, http.StatusInternalServerError}
 			continue
 		}
 
 		_, err = f.WriteString(req.Key + ":" + req.Value + "\n")
 		closeErr := f.Close()
 		if err != nil || closeErr != nil {
-			req.Response <- Response{"", fmt.Errorf("%v %v", err, closeErr)}
+			req.Response <- Response{"", fmt.Errorf("%v %v", err, closeErr), http.StatusInternalServerError}
 			continue
 		}
 
-		req.Response <- Response{"Success", nil}
+		req.Response <- Response{"Success", nil, http.StatusOK}
 	}
 }
 
 func handleRemoveRequests() {
 	for req := range removeChan {
 		exists, err := wordExists(req.FilePath, req.Key)
+
 		if err != nil {
-			req.Response <- Response{"", err}
+			req.Response <- Response{"", err, http.StatusInternalServerError}
 			continue
 		}
 		if !exists {
-			req.Response <- Response{"", fmt.Errorf("Word '%s' does not exist", req.Key)}
+			req.Response <- Response{"", fmt.Errorf("Word '%s' does not exist", req.Key), http.StatusNotFound}
 			continue
 		}
 
 		contentBytes, err := os.ReadFile(req.FilePath)
 		if err != nil {
-			req.Response <- Response{"", err}
+			req.Response <- Response{"", err, http.StatusInternalServerError}
 			continue
 		}
 
@@ -133,11 +141,11 @@ func handleRemoveRequests() {
 		updatedContent := strings.Join(updatedLines, "\n")
 		err = os.WriteFile(req.FilePath, []byte(updatedContent), 0644)
 		if err != nil {
-			req.Response <- Response{"", err}
+			req.Response <- Response{"", err, http.StatusInternalServerError}
 			continue
 		}
 
-		req.Response <- Response{"Success", nil}
+		req.Response <- Response{"Success", nil, http.StatusOK}
 	}
 }
 
@@ -145,7 +153,7 @@ func handleGetRequests() {
 	for req := range getChan {
 		f, err := os.Open(req.FilePath)
 		if err != nil {
-			req.Response <- Response{"", err}
+			req.Response <- Response{"", err, http.StatusInternalServerError}
 			continue
 		}
 
@@ -163,9 +171,9 @@ func handleGetRequests() {
 		f.Close()
 
 		if found {
-			req.Response <- Response{line, nil}
+			req.Response <- Response{line, nil, http.StatusOK}
 		} else {
-			req.Response <- Response{"", fmt.Errorf("%s not found", req.Key)}
+			req.Response <- Response{"", fmt.Errorf("%s not found", req.Key), http.StatusNotFound}
 		}
 	}
 }
@@ -174,7 +182,7 @@ func handleListRequests() {
 	for req := range listChan {
 		f, err := os.Open(req.FilePath)
 		if err != nil {
-			req.Response <- Response{"", err}
+			req.Response <- Response{"", err, http.StatusInternalServerError}
 			continue
 		}
 
@@ -186,12 +194,12 @@ func handleListRequests() {
 		}
 
 		if err := scanner.Err(); err != nil {
-			req.Response <- Response{"", err}
+			req.Response <- Response{"", err, http.StatusInternalServerError}
 		} else if len(lines) == 0 {
-			req.Response <- Response{"Empty", nil}
+			req.Response <- Response{"Empty", nil, http.StatusOK}
 		} else {
 			combinedLines := strings.Join(lines, "\n")
-			req.Response <- Response{combinedLines, nil}
+			req.Response <- Response{combinedLines, nil, http.StatusOK}
 		}
 
 		f.Close()
