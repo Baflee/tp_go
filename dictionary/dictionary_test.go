@@ -1,146 +1,105 @@
 package dictionary
 
 import (
+	"log"
+	"net/http"
 	"os"
 	"testing"
+	"tp_go/db"
 
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
+var testClient *mongo.Client
+var testCollection *mongo.Collection
+
+var baseTestDB = "db_dictionary_test"
+var baseTestCollection = "dictionary"
+
+func init() {
+	//Load the .env file
+	err := godotenv.Load("../.env")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	// Establishes a connection to MongoDB.
+	// This will block until the connection is established or fails.
+	db.ConnectDB(os.Getenv("MONGO_URI"))
+
+	// Initialize important elements of the dictionary
+	InitializeDictionary()
+}
+
 func TestDictionaryAdd(t *testing.T) {
-	filePathTest := "dictionary_test.txt"
-	file, _ := os.Create(filePathTest)
 
 	// Success Case
-	result, err, statusCode := Add(filePathTest, "new_word", "definition")
+	result, err, statusCode := Add(baseTestDB, baseTestCollection, "new_word", "definition")
 	assert.NoError(t, err)
-	assert.Equal(t, "Success", result)
-	assert.Equal(t, 200, statusCode)
+	assert.Equal(t, "Success : Word 'new_word' has been added", result)
+	assert.Equal(t, http.StatusOK, statusCode)
 
 	// Key Already Exists Case
-	Add(filePathTest, "existing_key", "definition")
-	result, err, statusCode = Add("dictionary_test.txt", "existing_key", "definition")
+	Add(baseTestDB, baseTestCollection, "existing_key", "definition")
+	result, err, statusCode = Add(baseTestDB, baseTestCollection, "existing_key", "definition")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "already exists")
-	assert.Equal(t, 409, statusCode)
+	assert.Equal(t, http.StatusConflict, statusCode)
 
-	// Invalid File Path Case
-	result, err, statusCode = Add("invalid_file_path.txt", "new_word", "definition")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "File 'invalid_file_path.txt' not found")
-	assert.Equal(t, 404, statusCode)
-
-	defer func() {
-		// Close the file before removing it
-		file.Close()
-		// Remove the temporary file
-		if err := os.Remove(filePathTest); err != nil {
-			t.Logf("Failed to remove temporary file: %v", err)
-		}
-	}()
+	Remove(baseTestDB, baseTestCollection, "new_word")
+	Remove(baseTestDB, baseTestCollection, "existing_key")
 }
 
 func TestDictionaryRemove(t *testing.T) {
-	filePathTest := "dictionary_test.txt"
-	file, _ := os.Create(filePathTest)
-	Add(filePathTest, "existing_key", "definition")
+
+	Add(baseTestDB, baseTestCollection, "existing_key", "definition")
 
 	// Success Case
-	result, err, statusCode := Remove(filePathTest, "existing_key")
+	result, err, statusCode := Remove(baseTestDB, baseTestCollection, "existing_key")
 	assert.NoError(t, err)
-	assert.Equal(t, "Success", result)
-	assert.Equal(t, 200, statusCode)
+	assert.Equal(t, "Success : Word 'existing_key' has been removed", result)
+	assert.Equal(t, http.StatusOK, statusCode)
 
 	// Key Not Found Case
-	result, err, statusCode = Remove(filePathTest, "non_existing_key")
+	result, err, statusCode = Remove(baseTestDB, baseTestCollection, "non_existing_key")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "does not exist")
-	assert.Equal(t, 404, statusCode)
-
-	// Invalid File Path Case
-	result, err, statusCode = Remove("invalid_file_path.txt", "existing_key")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "File 'invalid_file_path.txt' not found")
-	assert.Equal(t, 404, statusCode)
-
-	defer func() {
-		// Close the file before removing it
-		file.Close()
-		// Remove the temporary file
-		if err := os.Remove(filePathTest); err != nil {
-			t.Logf("Failed to remove temporary file: %v", err)
-		}
-	}()
+	assert.Equal(t, http.StatusNotFound, statusCode)
 }
 
 func TestDictionaryGet(t *testing.T) {
-	filePathTest := "dictionary_test.txt"
-	file, _ := os.Create(filePathTest)
-	Add(filePathTest, "existing_key", "definition")
+
+	Add(baseTestDB, baseTestCollection, "existing_key", "definition")
 
 	// Success Case
-	result, err, statusCode := Get(filePathTest, "existing_key")
+	result, err, statusCode := Get(baseTestDB, baseTestCollection, "existing_key")
 	assert.NoError(t, err)
-	assert.Contains(t, result, "")
-	assert.Equal(t, 200, statusCode)
+	assert.Equal(t, "'existing_key' : 'definition'", result)
+	assert.Equal(t, http.StatusOK, statusCode)
 
 	// Key Not Found Case
-	result, err, statusCode = Get(filePathTest, "non_existing_key")
+	result, err, statusCode = Get(baseTestDB, baseTestCollection, "non_existing_key")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
-	assert.Equal(t, 404, statusCode)
+	assert.Equal(t, http.StatusNotFound, statusCode)
 
-	// Invalid File Path Case
-	result, err, statusCode = Get("invalid_file_path.txt", "existing_key")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "File 'invalid_file_path.txt' not found")
-	assert.Equal(t, 404, statusCode)
-
-	defer func() {
-		// Close the file before removing it
-		file.Close()
-		// Remove the temporary file
-		if err := os.Remove(filePathTest); err != nil {
-			t.Logf("Failed to remove temporary file: %v", err)
-		}
-	}()
+	Remove(baseTestDB, baseTestCollection, "existing_key")
 }
 
 func TestDictionaryList(t *testing.T) {
-	filePathTest := "dictionary_test.txt"
-	file, _ := os.Create(filePathTest)
 
-	Add(filePathTest, "word1", "definition1")
-	Add(filePathTest, "word2", "definition2")
+	Add(baseTestDB, baseTestCollection, "word1", "definition1")
+	Add(baseTestDB, baseTestCollection, "word2", "definition2")
 
 	// Success Case with Multiple Words
-	result, err, statusCode := List(filePathTest)
+	result, err, statusCode := List(baseTestDB, baseTestCollection)
 	assert.NoError(t, err)
-	assert.Contains(t, result, "word1:definition1")
-	assert.Contains(t, result, "word2:definition2")
-	assert.Equal(t, 200, statusCode)
+	assert.Contains(t, result, "word1: definition1")
+	assert.Contains(t, result, "word2: definition2")
+	assert.Equal(t, http.StatusOK, statusCode)
 
-	Remove(filePathTest, "word1")
-	Remove(filePathTest, "word2")
-
-	// Empty File Case
-	result, err, statusCode = List(filePathTest)
-	assert.Equal(t, "Empty", result)
-	assert.NoError(t, err)
-	assert.Equal(t, 200, statusCode)
-
-	// Invalid File Path Case
-	result, err, statusCode = List("invalid_file_path.txt")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "File 'invalid_file_path.txt' not found")
-	assert.Equal(t, 404, statusCode)
-
-	defer func() {
-		// Close the file before removing it
-		file.Close()
-		// Remove the temporary file
-		if err := os.Remove(filePathTest); err != nil {
-			t.Logf("Failed to remove temporary file: %v", err)
-		}
-	}()
+	Remove(baseTestDB, baseTestCollection, "word1")
+	Remove(baseTestDB, baseTestCollection, "word2")
 }

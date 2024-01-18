@@ -1,16 +1,18 @@
 package dictionary
 
 import (
-	"bufio"
-	"bytes"
+	"context"
 	"fmt"
-	"io"
 	"net/http"
-	"os"
 	"strings"
+	"time"
+	"tp_go/db"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func init() {
+func InitializeDictionary() {
 	go handleAddRequests()
 	go handleRemoveRequests()
 	go handleGetRequests()
@@ -21,26 +23,31 @@ var (
 	addChan      = make(chan AddRequest)
 	removeChan   = make(chan GetRemoveRequest)
 	getChan      = make(chan GetRemoveRequest)
-	listChan     = make(chan ResetListRequest)
+	listChan     = make(chan ListRequest)
 	responseChan = make(chan Response)
 )
 
+var collection *mongo.Collection
+
 type AddRequest struct {
-	FilePath string
-	Key      string
-	Value    string
-	Response chan Response
+	Db         string
+	Collection string
+	Key        string
+	Value      string
+	Response   chan Response
 }
 
 type GetRemoveRequest struct {
-	FilePath string
-	Key      string
-	Response chan Response
+	Db         string
+	Collection string
+	Key        string
+	Response   chan Response
 }
 
-type ResetListRequest struct {
-	FilePath string
-	Response chan Response
+type ListRequest struct {
+	Db         string
+	Collection string
+	Response   chan Response
 }
 
 type Response struct {
@@ -49,209 +56,147 @@ type Response struct {
 	Http   int
 }
 
-func Add(filePath string, key string, value string) (string, error, int) {
+func Add(db string, collection string, key string, value string) (string, error, int) {
 	responseChan := make(chan Response)
-	addChan <- AddRequest{FilePath: filePath, Key: key, Value: value, Response: responseChan}
+	addChan <- AddRequest{Db: db, Collection: collection, Key: key, Value: value, Response: responseChan}
 	response := <-responseChan
 	return response.Result, response.Err, response.Http
 }
 
-func Remove(filePath string, key string) (string, error, int) {
+func Remove(db string, collection string, key string) (string, error, int) {
 	responseChan := make(chan Response)
-	removeChan <- GetRemoveRequest{FilePath: filePath, Key: key, Response: responseChan}
+	removeChan <- GetRemoveRequest{Db: db, Collection: collection, Key: key, Response: responseChan}
 	response := <-responseChan
 	return response.Result, response.Err, response.Http
 }
 
-func Get(filePath string, key string) (string, error, int) {
+func Get(db string, collection string, key string) (string, error, int) {
 	responseChan := make(chan Response)
-	getChan <- GetRemoveRequest{FilePath: filePath, Key: key, Response: responseChan}
+	getChan <- GetRemoveRequest{Db: db, Collection: collection, Key: key, Response: responseChan}
 	response := <-responseChan
 	return response.Result, response.Err, response.Http
 }
 
-func List(filePath string) (string, error, int) {
+func List(db string, collection string) (string, error, int) {
 	responseChan := make(chan Response)
-	listChan <- ResetListRequest{FilePath: filePath, Response: responseChan}
+	listChan <- ListRequest{Db: db, Collection: collection, Response: responseChan}
 	response := <-responseChan
 	return response.Result, response.Err, response.Http
 }
 
 func handleAddRequests() {
 	for req := range addChan {
-		contentFile, err := checkFile(req.FilePath)
+		collection = db.Client.Database(req.Db).Collection(req.Collection)
 
-		if err != nil {
-			req.Response <- Response{"", fmt.Errorf("File '%s' not found", req.FilePath), http.StatusNotFound}
-			continue
-		}
+		// Setup the filter to check if the word already exists
+		filter := bson.M{"key": req.Key}
+		var result bson.M
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second) // Help to avoid being stuck indefinitely in this request
+		defer cancel()
+		err := collection.FindOne(ctx, filter).Decode(&result)
 
-		exists, err := wordExists(contentFile, err, req.Key)
-
-		if len(req.Key) < 3 || len(req.Key) > 20 || len(req.Value) < 5 {
-			req.Response <- Response{"", fmt.Errorf("Invalid input data"), http.StatusBadRequest}
-			continue
-		}
-
-		if err != nil {
-			req.Response <- Response{"", err, http.StatusInternalServerError}
-			continue
-		}
-
-		if exists {
+		// If the word already exists, return an error
+		if err == nil {
 			req.Response <- Response{"", fmt.Errorf("Word '%s' already exists", req.Key), http.StatusConflict}
 			continue
 		}
 
-		f, err := os.OpenFile(req.FilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		// Otherwise, add the new word
+		doc := bson.M{"key": req.Key, "value": req.Value}
+		_, err = collection.InsertOne(ctx, doc)
 		if err != nil {
 			req.Response <- Response{"", err, http.StatusInternalServerError}
 			continue
 		}
 
-		_, err = f.WriteString(req.Key + ":" + req.Value + "\n")
-		closeErr := f.Close()
-		if err != nil || closeErr != nil {
-			req.Response <- Response{"", fmt.Errorf("%v %v", err, closeErr), http.StatusInternalServerError}
-			continue
-		}
-
-		req.Response <- Response{"Success", nil, http.StatusOK}
+		// Send confirmation of word addition
+		req.Response <- Response{fmt.Sprintf("Success : Word '%s' has been added", req.Key), nil, http.StatusOK}
 	}
 }
 
 func handleRemoveRequests() {
 	for req := range removeChan {
-		contentFile, err := checkFile(req.FilePath)
+		collection = db.Client.Database(req.Db).Collection(req.Collection)
 
-		if err != nil {
-			req.Response <- Response{"", fmt.Errorf("File '%s' not found", req.FilePath), http.StatusNotFound}
-			continue
-		}
+		// Attempt to remove the word
+		filter := bson.M{"key": req.Key}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		result, err := collection.DeleteOne(ctx, filter)
 
-		exists, err := wordExists(contentFile, err, req.Key)
-
+		// Manage errors or missing words to be deleted
 		if err != nil {
 			req.Response <- Response{"", err, http.StatusInternalServerError}
 			continue
 		}
-
-		if !exists {
+		if result.DeletedCount == 0 {
 			req.Response <- Response{"", fmt.Errorf("Word '%s' does not exist", req.Key), http.StatusNotFound}
 			continue
 		}
 
-		contentBytes, err := os.ReadFile(req.FilePath)
-		if err != nil {
-			req.Response <- Response{"", err, http.StatusInternalServerError}
-			continue
-		}
-
-		content := string(contentBytes)
-		lines := strings.Split(content, "\n")
-
-		var updatedLines []string
-		for _, line := range lines {
-			if !strings.HasPrefix(line, req.Key+":") {
-				updatedLines = append(updatedLines, line)
-			}
-		}
-
-		updatedContent := strings.Join(updatedLines, "\n")
-		err = os.WriteFile(req.FilePath, []byte(updatedContent), 0644)
-		if err != nil {
-			req.Response <- Response{"", err, http.StatusInternalServerError}
-			continue
-		}
-
-		req.Response <- Response{"Success", nil, http.StatusOK}
+		// Send confirmation of word removal
+		req.Response <- Response{fmt.Sprintf("Success : Word '%s' has been removed", req.Key), nil, http.StatusOK}
 	}
 }
 
 func handleGetRequests() {
 	for req := range getChan {
-		contentFile, err := checkFile(req.FilePath)
+		collection = db.Client.Database(req.Db).Collection(req.Collection)
+
+		// Setup the filter to find the document with the given key
+		filter := bson.M{"key": req.Key}
+		var result bson.M
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		err := collection.FindOne(ctx, filter).Decode(&result)
+
+		// Handle errors or missing words
 		if err != nil {
-			req.Response <- Response{"", fmt.Errorf("File '%s' not found", req.FilePath), http.StatusNotFound}
+			req.Response <- Response{"", fmt.Errorf("Word '%s' not found", req.Key), http.StatusNotFound}
 			continue
 		}
 
-		reader := bufio.NewReader(bytes.NewReader(contentFile))
-		scanner := bufio.NewScanner(reader)
-		found := false
-		line := ""
-		for scanner.Scan() {
-			line = scanner.Text()
-			if strings.HasPrefix(line, req.Key+":") {
-				found = true
-				line = strings.TrimPrefix(line, req.Key+":")
-				break
-			}
+		value, ok := result["value"].(string)
+		if !ok {
+			req.Response <- Response{"", fmt.Errorf("Invalid data format for key: %s", req.Key), http.StatusInternalServerError}
+			continue
 		}
 
-		if found {
-			req.Response <- Response{line, nil, http.StatusOK}
-		} else {
-			req.Response <- Response{"", fmt.Errorf("%s not found", req.Key), http.StatusNotFound}
-		}
+		// Send the formatted string of the searched word and its value
+		req.Response <- Response{fmt.Sprintf("'%s' : '%s'", req.Key, value), nil, http.StatusOK}
 	}
 }
 
 func handleListRequests() {
 	for req := range listChan {
-		contentFile, err := checkFile(req.FilePath)
+		collection = db.Client.Database(req.Db).Collection(req.Collection)
 
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		// Retrieve all documents from the collection
+		cursor, err := collection.Find(ctx, bson.M{})
 		if err != nil {
-			req.Response <- Response{"", fmt.Errorf("File '%s' not found", req.FilePath), http.StatusNotFound}
+			req.Response <- Response{"", err, http.StatusInternalServerError}
+			continue
+		}
+		defer cursor.Close(ctx)
+
+		var results []bson.M
+		if err = cursor.All(ctx, &results); err != nil {
+			req.Response <- Response{"", err, http.StatusInternalServerError}
 			continue
 		}
 
-		reader := bufio.NewReader(bytes.NewReader(contentFile))
-		scanner := bufio.NewScanner(reader)
-		var lines []string
-
-		for scanner.Scan() {
-			lines = append(lines, scanner.Text())
+		// Format the results as a string for the response
+		var list strings.Builder
+		for _, result := range results {
+			key := result["key"].(string)
+			value := result["value"].(string)
+			list.WriteString(key + ": " + value + "\n")
 		}
 
-		if err := scanner.Err(); err != nil {
-			req.Response <- Response{"", err, http.StatusInternalServerError}
-		} else if len(lines) == 0 {
-			req.Response <- Response{"Empty", nil, http.StatusOK}
-		} else {
-			combinedLines := strings.Join(lines, "\n")
-			req.Response <- Response{combinedLines, nil, http.StatusOK}
-		}
+		// Send the formatted string of all words and values
+		req.Response <- Response{list.String(), nil, http.StatusOK}
 	}
-}
-
-func checkFile(filePath string) ([]byte, error) {
-	f, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	content, err := io.ReadAll(f)
-	defer f.Close()
-	if err != nil {
-		return nil, err
-	}
-
-	return content, nil
-}
-
-func wordExists(contentFile []byte, err error, word string) (bool, error) {
-	reader := bufio.NewReader(bytes.NewReader(contentFile))
-	scanner := bufio.NewScanner(reader)
-	for scanner.Scan() {
-		if strings.HasPrefix(scanner.Text(), word+":") {
-			return true, nil
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return false, err
-	}
-
-	return false, nil
 }

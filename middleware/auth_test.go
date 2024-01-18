@@ -1,12 +1,23 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
+
+	"github.com/joho/godotenv"
 )
 
 func TestAuthMiddleware(t *testing.T) {
+
+	//Load the .env file
+	err := godotenv.Load("../.env")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
 	// Create a handler that will be wrapped by the AuthMiddleware
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -24,7 +35,7 @@ func TestAuthMiddleware(t *testing.T) {
 	}{
 		{
 			name:          "Valid Token",
-			authorization: "Bearer RaccoonAreTheBestAnimalsExisting",
+			authorization: "Bearer " + os.Getenv("AUTH_TOKEN"),
 			expectedCode:  http.StatusOK,
 		},
 		{

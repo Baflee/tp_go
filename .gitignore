@@ -1,0 +1,30 @@
+# Compiled files and directories
+/bin/
+/pkg/
+*.o
+*.a
+*.so
+
+# Output of the go coverage tool
+*.cover
+
+# Dependency directories (remove these lines if you want to check in your vendor folder)
+vendor/
+Gopkg.lock
+go.sum
+
+# IDE and editor folders
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Operating system files
+.DS_Store
+Thumbs.db
+
+# Local development files
+.env
+.env.*
+!.env.example
