@@ -67,10 +67,9 @@ curl localhost:8080/dictionary
 
 - **Gorilla Mux Router:** Manages HTTP requests and routes them to appropriate handlers.
 - **Concurrent Request Handling:** Utilizes Go channels and goroutines for concurrent processing of dictionary operations.
-- **File-Based Storage:** Dictionary data is stored and managed in a text file.
+- **DB-Based Storage:** Dictionary data is stored and managed in a database NoSQL called MongoDB.
 
 ## Notes
 
 - The service is designed for educational and demonstration purposes and is not optimized for production use.
-- The dictionary data is stored in a plain text file (`dictionary.txt`), and it's structured in a simple key-value format.
 - Concurrency control is implemented to handle simultaneous read/write operations to the dictionary file.
