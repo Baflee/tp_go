@@ -61,7 +61,7 @@ func TestRouter(t *testing.T) {
 			method:     "POST",
 			path:       "/dictionary/add?word=testword&definition=testdefinition",
 			statusCode: http.StatusOK,
-			expected:   "Word testword Added",
+			expected:   "Success : Word 'testword' has been added",
 		},
 		{
 			name:       "TestRouterPathGet",
