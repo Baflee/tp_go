@@ -35,12 +35,12 @@ func actionAdd(db string, w http.ResponseWriter, r *http.Request) {
 	key := r.FormValue("word")
 	value := r.FormValue("definition")
 
-	_, err, statusCode := dictionary.Add(db, "dictionary", key, value)
+	result, err, statusCode := dictionary.Add(db, "dictionary", key, value)
 	if err != nil {
 		httpErrorMsg := "HTTP Error: " + strconv.Itoa(statusCode) + " - " + err.Error()
 		http.Error(w, httpErrorMsg, statusCode)
 	} else {
-		fmt.Fprintf(w, "Word %s Added", key)
+		fmt.Fprintf(w, result)
 	}
 }
 
